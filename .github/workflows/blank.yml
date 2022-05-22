@@ -1,0 +1,130 @@
+import cv2
+import mediapipe as mp
+import numpy as np
+import PoseModule as pm
+from tkinter import *
+from PIL import Image,ImageTk
+from tkinter import ttk
+from tkinter import filedialog
+count=0
+root =Tk()
+root.configure(bg="#000000")
+root.state("zoomed")
+# _________________
+video_frame = Frame(root,height=580,width=720)
+video_labal = Label(root,height=580,width=720)
+video_frame.place(x=15,y=240)
+video_labal.place(x=15,y=240)
+video_path = 0
+def reset():
+    global count
+    count=0
+
+def path_select():
+    global video_path,cap
+    video_path = filedialog.askopenfilename()
+    cap = cv2.VideoCapture(video_path)
+    text = Label(root,text="Recorded Video  ",bg="#3a3b3c",fg="#ffffff",font=("Calibri",20))
+    text.place(x=250,y=165)
+    reset()
+# For Live feed
+def video_live():
+    global video_path,cap
+    video_path = 0
+    cap = cv2.VideoCapture(video_path)
+    text = Label(root,text="Live Video Feed",bg="#3a3b3c",fg="#ffffff",font=("Calibri",20))
+    text.place(x=250,y=165)
+    reset()
+# ______Live Button ________
+
+live_btn = Button(root, height = 2, width=4,text="Live", fg="#DBDBDB", bg="#3a3b3c", command=lambda:video_live())
+live_btn.place(x=1200,y=20)
+text = Label(root,text="LIVE VIDEO FEED",bg="#3a3b3c",fg="#ffffff",font=("Calibri",20))
+text.place(x=250,y=165)
+text = Label(root,text="  For Live Video",bg="#3a3b3c",fg="#ffffff",font=("Calibri",20))
+text.place(x=1000,y=30)
+# ______Browse Button_______
+
+browse_btn = Button(root, height = 2, width=6,text='Browse', bg="#3a3b3c", command=lambda:path_select())
+browse_btn.place(x=1200,y=80)
+text = Label(root,text="To Browse Video",bg="#3a3b3c",fg="#ffffff",font=("Calibri",20))
+text.place(x=1000,y=90)
+
+cnt_lb = Label(root,text='Count',bg="#3a3b3c",fg="#ffffff",font=("Calibri",20))
+cnt_lb.place(x=1000,y=300)
+
+reset_btn = Button(root, height = 2, width=6,text='Reset', bg="#3a3b3c", command=lambda:reset())
+reset_btn.place(x=1100,y=400)
+
+
+ttl = Label(root,text="SIDE LUNGE EXERCISE",bg="#3c3c3c",fg="#ffff00",font=("Calibri",25))
+ttl.place(x=200,y=100)
+# =================================================================================================================================
+
+#================================================================================================================================
+cap = cv2.VideoCapture(video_path)
+
+detector = pm.poseDetector()
+
+direction = 0
+form = 0
+feedback = "Fix Form"
+while True:
+ 
+    ret, img = cap.read() #640 x 480
+    #Determine dimensions of video - Help with creation of box in Line 43
+    width  = cap.get(3)  # float `width`
+    height = cap.get(4)  # float `height`
+    # print(width, height)
+    
+    img = detector.findPose(img, False)
+    lmList = detector.findPosition(img, False)
+    # print(lmList)
+    if len(lmList) != 0:
+        leg_right = detector.findAngle(img, 24, 26, 28)
+        leg_left = detector.findAngle(img, 23, 25, 27)
+        
+        
+        #Percentage of success of sidelunge
+        per = np.interp(leg_right, (170, 140), (100, 0)) or np.interp(leg_left, (170, 140), (100, 0))
+        
+
+        #Check to ensure right form before starting the program
+        if leg_right > 170 and leg_left > 170:
+            form = 1
+    
+        #Check for full range of motion for the sidelunge
+        if form == 1:
+            if per == 0:
+                if leg_right > 170 and leg_left > 170:
+                    feedback = "Straight"
+                    if direction == 0:
+                        count += 0.5
+                        direction = 1
+                else:
+                    feedback = "Fix Form"
+                    
+            if per == 100:
+                if leg_right < 140 or leg_left < 140:
+                    feedback = "Lean"
+                    if direction == 1:
+                        count += 0.5
+                        direction = 0
+                else:
+                    feedback = "Fix Form"
+            
+        cnt = Label(root,text=str(int(count)),bg="#3a3b3c",fg="#ffffff",font=("Calibri",20))
+        cnt.place(x=900,y=300)
+        #Feedback 
+        cv2.rectangle(img, (500, 0), (640, 40), (255, 0, 255))
+        cv2.putText(img, feedback, (500, 40 ), cv2.FONT_HERSHEY_PLAIN, 2,
+                    (0, 255, 0), 2)
+                
+        img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
+        cv2.resize(img,(720,580))
+        img = ImageTk.PhotoImage(Image.fromarray(img),Image.ANTIALIAS)
+        video_labal["image"]=img
+        
+    else:
+        cap.set(cv2.CAP_PROP_POS_FRAMES,0)
+    root.update()
